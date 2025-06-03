@@ -15,14 +15,34 @@
     </thead>
     <tbody>
       <tr
+        v-for="asset in assets"
+        :key="asset.id"
         class="border-b border-gray-200 hover:bg-gray-100 hover:bg-orange-100"
       >
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
+        <td>
+          <img
+            :src="`https://static.coincap.io/assets/icons/${asset.symbol.toLowerCase()}@2x.png`"
+            alt="asset.name"
+            class="w-8 h-8"
+          />
+        </td>
+        <td>
+          <b>#{{ asset.rank }}</b>
+        </td>
+        <td>{{ asset.name }}</td>
+        <td>{{ asset.priceUsd | dollar }}</td>
+        <td>{{ asset.marketCapUsd | dollar }}</td>
+        <td>
+          <span
+            :class="[
+              asset.changePercent24Hr.includes('-')
+                ? 'text-red-600'
+                : 'text-green-600',
+            ]"
+          >
+            {{ asset.changePercent24Hr | percent }}
+          </span>
+        </td>
         <td class="hidden sm:block"></td>
       </tr>
     </tbody>
@@ -32,7 +52,6 @@
 <script>
 export default {
   name: 'PxAssetsTable',
-
   props: {
     assets: {
       type: Array,
