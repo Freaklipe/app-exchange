@@ -4,7 +4,9 @@
     @click="buttonClick"
   >
     <beat-loader v-if="isLoading" :color="'#68d391'" :size="8" />
-    <slot v-show="!isLoading"></slot>
+    <p v-show="!isLoading">
+      <slot></slot>
+    </p>
   </button>
 </template>
 

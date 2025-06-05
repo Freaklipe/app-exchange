@@ -46,19 +46,26 @@
         </div>
 
         <div class="my-10 sm:mt-0 flex flex-col justify-center text-center">
-          <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Cambiar</button>
+          <button
+            @click="toggleConvert()"
+            class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+          >
+            {{ fromUsd ? 'USD a ' + asset.symbol : asset.symbol + ' a USD' }}
+          </button>
 
           <div class="flex flex-row my-5">
             <label class="w-full" for="convertValue">
               <input
+                v-model="convertValue"
                 id="convertValue"
                 type="number"
+                :placeholder="fromUsd ? 'Valor en USD' : 'Valor en ' + asset.symbol"
                 class="text-center bg-white focus:outline-none focus:shadow-outline border border-gray-300 rounded-lg py-2 px-4 block w-full appearance-none leading-normal"
               />
             </label>
           </div>
 
-          <span class="text-xl"></span>
+          <span class="text-xl">{{ convertResult }} {{ fromUsd ? asset.symbol : 'USD' }}</span>
         </div>
       </div>
 
@@ -97,27 +104,58 @@
         history: [],
         markets: [],
         isLoading: false,
+        fromUsd: true,
+        convertValue: null,
       }
     },
     computed: {
       min() {
-        return Math.min(...this.history.map((h) => parseFloat(h.priceUsd).toFixed(2)))
+        let min = Infinity
+        for (const h of this.history) {
+          const price = +parseFloat(h.priceUsd).toFixed(2)
+          if (price < min) min = price
+        }
+        return min
       },
 
       max() {
-        return Math.max(...this.history.map((h) => parseFloat(h.priceUsd).toFixed(2)))
+        let max = -Infinity
+        for (const h of this.history) {
+          const price = +parseFloat(h.priceUsd).toFixed(2)
+          if (price > max) max = price
+        }
+        return max
       },
 
       avg() {
-        return Math.abs(...this.history.map((h) => parseFloat(h.priceUsd).toFixed(2)))
+        if (!this.history.length) return 0
+
+        let total = 0
+
+        for (const h of this.history) {
+          // convierte a número con 2 decimales
+          const price = +parseFloat(h.priceUsd).toFixed(2)
+          total += price
+        }
+
+        // promedio redondeado a 2 decimales
+        return +(total / this.history.length).toFixed(2)
       },
 
       chartData() {
-        const data = []
-        this.history.map((h) => {
-          data.push([h.date, parseFloat(h.priceUsd).toFixed(2)])
-        })
-        return data
+        return this.history.map((h) => [h.date, +parseFloat(h.priceUsd).toFixed(2)])
+      },
+
+      convertResult() {
+        if (!this.convertValue) return null
+        const result = this.fromUsd ? this.convertValue / this.asset.priceUsd : this.asset.priceUsd * this.convertValue
+        return result.toFixed(4)
+      },
+    },
+
+    watch: {
+      $route() {
+        this.getCoin()
       },
     },
 
@@ -126,45 +164,47 @@
       this.getCoin()
     },
     methods: {
-      getCoin() {
-        const id = this.$route.params.coinId
+      async getCoin() {
+        const { coinId } = this.$route.params
 
-        Promise.all([api.getAsset(id), api.getAssetHistory(id), api.getMarkets(id)])
-          .then(([asset, history, markets]) => {
-            this.asset = asset
-            this.history = history
-            this.markets = markets
-          })
-          .finally(() => {
-            this.isLoading = false
-          })
+        try {
+          const [asset, history, markets] = await Promise.all([
+            api.getAsset(coinId),
+            api.getAssetHistory(coinId),
+            api.getMarkets(coinId),
+          ])
+
+          this.asset = asset
+          this.history = history
+          this.markets = markets
+        } finally {
+          this.isLoading = false
+        }
+      },
+      async getWebSite(exchange) {
+        const { exchangeId } = exchange
+        this.$set(exchange, 'isLoading', true)
+
+        try {
+          const { exchangeUrl } = await api.getExchange(exchangeId)
+          this.$set(exchange, 'url', exchangeUrl)
+        } catch (error) {
+          this.$set(exchange, 'url', 'no-url')
+        } finally {
+          this.$set(exchange, 'isLoading', false)
+        }
       },
 
-      // async getWebSiteX(exchange) {
-      //   try {
-      //     this.$set(exchange, 'isLoading', true)
-      //     const res = await api.getExchange(exchange.exchangeId)
-
-      //     if (res && res.exchangeUrl) {
-      //       this.$set(exchange, 'url', res.exchangeUrl)
-      //     }
-      //   } catch (error) {
-      //     console.error('Error getting exchange:', error)
-      //   } finally {
-      //     this.$set(exchange, 'isLoading', false)
-      //   }
-      // },
-      getWebSite(exchange) {
-        this.$set(exchange, 'isLoading', true)
-        return api
-          .getExchange(exchange.exchangeId)
-          .then(({ data }) => {
-            this.$set(exchange, 'url', data.exchangeUrl)
-          })
-          .finally(() => {
-            this.$set(exchange, 'isLoading', false)
-          })
+      toggleConvert() {
+        this.fromUsd = !this.fromUsd
       },
     },
   }
 </script>
+
+<style scoped>
+  td {
+    padding: 10px;
+    text-align: center;
+  }
+</style>
